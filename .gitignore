@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+*.db
+*.sqlite3
+.DS_Store
+.idea/
+.gradle/
+android/local.properties
+android/**/build/
+backend/data/

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Resilient Positioning</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#111827;background:#f3f4f6}body{margin:0}.shell{max-width:1200px;margin:auto;padding:24px}.top{display:flex;gap:12px;align-items:end;flex-wrap:wrap}.card{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 1px 2px #0000000a}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.metric b{display:block;font-size:22px;margin-top:4px}.metric span{font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em}#map{height:560px;border-radius:10px}.status{font-size:13px;color:#4b5563}select{padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;background:white}@media(max-width:760px){.metrics{grid-template-columns:1fr 1fr}#map{height:420px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="top"><div><h1 style="margin:0">Resilient Positioning</h1><div class="status" id="status">waiting for telemetry</div></div><label style="margin-left:auto">Device<br><select id="device"></select></label></div>
+  <div class="metrics">
+    <div class="card metric"><span>Source</span><b id="source">-</b></div>
+    <div class="card metric"><span>Horizontal σ</span><b id="sigma">-</b></div>
+    <div class="card metric"><span>GNSS</span><b id="gnss">-</b></div>
+    <div class="card metric"><span>Fingerprint matches</span><b id="matches">-</b></div>
+  </div>
+  <div class="card"><div id="map"></div></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([-7.25,112.75],13);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+let marker=null,line=L.polyline([]).addTo(map),active='';
+const els={device:document.getElementById('device'),status:document.getElementById('status'),source:document.getElementById('source'),sigma:document.getElementById('sigma'),gnss:document.getElementById('gnss'),matches:document.getElementById('matches')};
+async function refreshDevices(){const r=await fetch('/v1/devices');const d=await r.json();const prev=active;els.device.innerHTML=d.devices.map(x=>`<option>${x}</option>`).join('');if(d.devices.length){active=d.devices.includes(prev)?prev:d.devices[0];els.device.value=active;await loadHistory();}}
+async function loadHistory(){if(!active)return;const r=await fetch(`/v1/positions/${encodeURIComponent(active)}?limit=500`);const d=await r.json();const pts=d.positions.map(p=>[p.latitude_deg,p.longitude_deg]);line.setLatLngs(pts);if(pts.length){map.fitBounds(line.getBounds().pad(.2));}}
+function render(p){if(active&&p.device_id!==active)return;active=p.device_id;const ll=[p.latitude_deg,p.longitude_deg];if(!marker)marker=L.marker(ll).addTo(map);else marker.setLatLng(ll);line.addLatLng(ll);els.source.textContent=p.source;els.sigma.textContent=`${p.horizontal_sigma_m.toFixed(1)} m`;els.gnss.textContent=p.gnss_available?'online':'offline';els.matches.textContent=`${p.wifi_matches} Wi-Fi / ${p.cell_matches} cell`;els.status.textContent=`last update ${new Date(p.timestamp_ms).toLocaleTimeString()}`;}
+els.device.addEventListener('change',async()=>{active=els.device.value;line.setLatLngs([]);await loadHistory();});
+refreshDevices();setInterval(refreshDevices,10000);
+const scheme=location.protocol==='https:'?'wss':'ws';const ws=new WebSocket(`${scheme}://${location.host}/ws`);ws.onopen=()=>{els.status.textContent='live feed connected';ws.send('ready')};ws.onmessage=e=>render(JSON.parse(e.data));ws.onclose=()=>els.status.textContent='live feed disconnected';
+</script>
+</body>
+</html>

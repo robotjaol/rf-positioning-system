@@ -1,0 +1,17 @@
+[project]
+name = "resilient-positioning-system"
+version = "0.1.0"
+description = "Phone-to-laptop resilient positioning using GNSS, IMU, Wi-Fi and cellular observations"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116,<1.0",
+  "numpy>=2.0,<3.0",
+  "uvicorn[standard]>=0.35,<1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<9.0", "httpx>=0.28,<1.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+testpaths = ["backend/tests"]
